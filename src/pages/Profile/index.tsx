@@ -1,41 +1,106 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
 
 import ProfileData from '../../components/ProfileData';
 
-import { Container, Main, LeftSide, RightSide, Repos, CalendarHeading } from './styles';
+import { Container, Main, LeftSide, RightSide, Repos, CalendarHeading, RepoIcon, Tab } from './styles';
 import RepoCard from '../../components/RepoCard';
 import RandomCalendar from '../../components/RandomCalendar';
+import { APIUser, APIRepo } from '../../@types';
+
+interface Data {
+    user?: APIUser,
+    repos?: APIRepo[],
+    error?: string
+}
 
 const Profile: React.FC = () => {
+    const { username = 'Guilherme1612' } = useParams()
+    const [data, setData] = useState<Data>()
+
+    useEffect(() => {
+        Promise.all([
+            fetch(`https://api.github.com/users/${username}`),
+            fetch(`https://api.github.com/users/${username}/repos`)
+        ]).then(async responses => {
+            const [userResponse, repoResponse] = responses
+
+            if (userResponse.status == 404) {
+                setData({error: 'User not found!'})
+                return;
+            }
+
+            const user = await userResponse.json();
+            const repos = await repoResponse.json();
+
+            const shuffledRepos = repos.sort(() => 0.50 - Math.random())
+            const slicedRepos = shuffledRepos.slice(0, 6)
+
+            setData({
+                user,
+                repos: slicedRepos
+            });
+        });
+    }, [username])
+
+    if (data?.error) {
+        return <h1>{data.error}</h1>
+    }
+
+    if (!data?.user || !data?.repos) {
+        return <h1>Loading...</h1>
+    }
+
+    const TabContent = () => {
+        return (
+            <div className="content">
+                <RepoIcon />
+                <span className="label">Repositories</span>
+                <span className="number">{data.user?.public_repos}</span>
+            </div>
+        )
+    }
+
     return (
         <Container>
+            <Tab className="desktop">
+                <div className="wrapper">
+                    <span className="offset" />
+                    <TabContent />
+                </div>
+                <span className="line" />
+            </Tab>
             <Main>
                 <LeftSide>
                     <ProfileData 
-                        username={"Guilherme1612"}
-                        name={"Guilherme Avelino"}
-                        avatarUrl={"https://avatars1.githubusercontent.com/u/58201367?s=460&u=32827adcba7f082a960a19d4f553a25523a58a70&v=4"}
-                        followers={887}
-                        following={7}
-                        company={"Facebook"}
-                        location={"São Paulo, Brasil"}
-                        email={"guilherme.avelino@github.com"}
-                        blog={undefined}
+                        username={data.user.login}
+                        name={data.user.name}
+                        avatarUrl={data.user.avatar_url}
+                        followers={data.user.followers}
+                        following={data.user.following}
+                        company={data.user.company}
+                        location={data.user.location}
+                        email={data.user.email}
+                        blog={data.user.blog}
                     />
                 </LeftSide>
                 <RightSide>
+                    <Tab className="mobile">
+                        <TabContent />
+                        <span className="line"></span>
+                    </Tab>
                     <Repos>
                         <h2>Random repos</h2>
                         <div>
-                            {[1, 2, 3, 4, 5, 6].map(n => (
+                            {data.repos.map(item => (
                                 <RepoCard 
-                                    key={n}
-                                    username={"Guilherme1612"}
-                                    reponame={"github-clone"}
-                                    description={" Clone da interface do github utilizando a API para realizar a exibição de dados dos usuários."}
-                                    language={n % 3 == 0 ? "JavaScript" : "TypeScript"}
-                                    stars={8}
-                                    forks={4}
+                                    key={item.name}
+                                    username={item.owner.login}
+                                    reponame={item.name}
+                                    description={item.description}
+                                    language={item.language}
+                                    stars={item.stargazers_count}
+                                    forks={item.forks}
                                 />
                             ))}
                         </div>
@@ -43,7 +108,6 @@ const Profile: React.FC = () => {
                     <CalendarHeading>
                         Random calendar (do not represent actual data)
                     </CalendarHeading>
-                    
                     <RandomCalendar />
                 </RightSide>
             </Main>
